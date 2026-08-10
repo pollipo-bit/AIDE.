@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Aide</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<meta name="theme-color" content="#3B4C7A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Aide">
+<script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --paper: #F6F4EE;
+    --panel: #FFFFFF;
+    --ink: #1F2430;
+    --ink-soft: #6B7280;
+    --accent: #3B4C7A;
+    --accent-soft: #EDEFF7;
+    --gold: #C9A227;
+    --border: #E4E0D6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'Segoe UI', 'Inter', system-ui, sans-serif;
+  }
+  .app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    max-width: 780px;
+    margin: 0 auto;
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
+  }
+  .header {
+    padding: max(20px, env(safe-area-inset-top)) 28px 16px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+  .header h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-weight: 600;
+    font-size: 22px;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  .header .tag {
+    font-size: 12px;
+    color: var(--ink-soft);
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .empty {
+    margin: auto;
+    text-align: center;
+    color: var(--ink-soft);
+    max-width: 420px;
+  }
+  .empty .mark {
+    width: 40px; height: 40px;
+    border: 1.5px solid var(--gold);
+    border-radius: 50%;
+    margin: 0 auto 16px auto;
+    display: flex; align-items: center; justify-content: center;
+    font-family: Georgia, serif;
+    color: var(--gold);
+    font-size: 18px;
+  }
+  .row { display: flex; gap: 10px; }
+  .row.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 82%;
+    padding: 12px 16px;
+    border-radius: 14px;
+    line-height: 1.5;
+    font-size: 15px;
+    white-space: pre-wrap;
+  }
+  .row.user .bubble { background: var(--accent); color: #fff; border-bottom-right-radius: 3px; }
+  .row.assistant .bubble { background: var(--accent-soft); color: var(--ink); border-bottom-left-radius: 3px; }
+  .row.assistant .label {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--gold); margin-bottom: 4px; font-weight: 600;
+  }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+  .typing span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--ink-soft);
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+  .composer {
+    padding: 16px 28px max(22px, env(safe-area-inset-bottom)) 28px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 10px;
+    align-items: flex-end;
+  }
+  textarea {
+    flex: 1; resize: none; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; font-size: 15px; font-family: inherit; color: var(--ink);
+    background: var(--paper); max-height: 140px; line-height: 1.4;
+  }
+  textarea:focus { outline: none; border-color: var(--accent); }
+  button.send {
+    background: var(--accent); color: #fff; border: none; border-radius: 12px;
+    padding: 12px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  button.send:disabled { opacity: 0.5; cursor: default; }
+  button.send:hover:not(:disabled) { opacity: 0.9; }
+  .error { color: #B3261E; font-size: 13px; padding: 0 28px 10px 28px; }
+  .messages::-webkit-scrollbar { width: 8px; }
+  .messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .attach-btn {
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--border);
+    border-radius: 12px; width: 44px; height: 44px; font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .attach-btn:hover { background: var(--border); }
+  .composer-wrap { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .attachments { display: flex; flex-wrap: wrap; gap: 8px; }
+  .attachment-chip {
+    display: flex; align-items: center; gap: 8px;
+    background: var(--accent-soft); border: 1px solid var(--border);
+    border-radius: 10px; padding: 6px 10px; font-size: 12px; color: var(--ink);
+    max-width: 200px;
+  }
+  .attachment-chip img { width: 24px; height: 24px; object-fit: cover; border-radius: 4px; }
+  .attachment-chip .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .attachment-chip .remove { cursor: pointer; color: var(--ink-soft); font-weight: 700; margin-left: 2px; }
+  .bubble-attachments { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .bubble-attachments img { width: 60px; height: 60px; object-fit: cover; border-radius: 8px; }
+  .bubble-attachments .file-pill {
+    font-size: 11px; background: rgba(255,255,255,0.25); border-radius: 6px; padding: 4px 8px;
+  }
+  .export-bar { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+  .export-bar button {
+    background: var(--panel); border: 1px solid var(--border); color: var(--accent);
+    border-radius: 8px; padding: 5px 10px; font-size: 11.5px; font-weight: 600;
+    cursor: pointer; transition: background 0.15s ease;
+  }
+  .export-bar button:hover { background: var(--accent-soft); }
+  .result-image { max-width: 100%; border-radius: 10px; margin-top: 8px; display: block; }
+  .image-export-bar { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .image-export-bar button {
+    background: var(--panel); border: 1px solid var(--border); color: var(--accent);
+    border-radius: 8px; padding: 5px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+  }
+  .image-export-bar button:hover { background: var(--accent-soft); }
+  .install-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 28px;
+    background: var(--accent-soft);
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .install-banner button {
+    background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <h1>Aide</h1>
+    <div class="tag">Your assistant</div>
+  </div>
+  <div class="install-banner" id="installBanner">
+    <span>Install Aide on this device for quick access.</span>
+    <button id="installBtn">Install</button>
+  </div>
+  <div class="messages" id="messages">
+    <div class="empty" id="emptyState">
+      <div class="mark">A</div>
+      <div>Ask a question, get help writing a resume or business plan, or attach a photo or document with the + button.</div>
+    </div>
+  </div>
+  <div class="error" id="errorBox" style="display:none;"></div>
+  <div class="composer">
+    <button class="attach-btn" id="attachBtn" title="Attach a photo or document">+</button>
+    <input type="file" id="fileInput" multiple accept="image/*,application/pdf,.txt,.md,.csv" style="display:none;">
+    <div class="composer-wrap">
+      <div class="attachments" id="attachments"></div>
+      <label id="editModeLabel" style="display:none; font-size:12px; color:var(--ink-soft); align-items:center; gap:6px;">
+        <input type="checkbox" id="editModeCheckbox">
+        Edit this photo with AI (describe the edit in your message, e.g. "remove the background")
+      </label>
+      <textarea id="input" placeholder="Message Aide..." rows="1"></textarea>
+    </div>
+    <button class="send" id="sendBtn">Send</button>
+  </div>
+</div>
+
+<script>
+  const messagesEl = document.getElementById('messages');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('sendBtn');
+  const emptyState = document.getElementById('emptyState');
+  const errorBox = document.getElementById('errorBox');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('fileInput');
+  const attachmentsEl = document.getElementById('attachments');
+  const editModeLabel = document.getElementById('editModeLabel');
+  const editModeCheckbox = document.getElementById('editModeCheckbox');
+  const installBanner = document.getElementById('installBanner');
+  const installBtn = document.getElementById('installBtn');
+
+  let history = [];
+  let pendingFiles = [];
+  let deferredPrompt = null;
+
+  const SUPPORTED_MIME_TYPES = [
+    "image/png", "image/jpeg", "image/webp", "image/heic", "image/heif",
+    "application/pdf", "text/plain", "text/markdown", "text/csv"
+  ];
+
+  // --- Install prompt (Android/Chrome) ---
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    installBanner.style.display = 'flex';
+  });
+  installBtn.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+    installBanner.style.display = 'none';
+  });
+
+  // --- Register service worker ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    });
+  }
+
+  // --- File handling ---
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  attachBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    for (const file of fileInput.files) {
+      const mimeType = file.type || 'application/octet-stream';
+      if (!SUPPORTED_MIME_TYPES.includes(mimeType)) {
+        errorBox.textContent = `"${file.name}" isn't a supported type. Aide can read images, PDFs, and plain text files (like .txt, .csv, .md) — for Word or Excel files, try saving/exporting as PDF first.`;
+        errorBox.style.display = 'block';
+        continue;
+      }
+      if (file.size > 15 * 1024 * 1024) {
+        errorBox.textContent = `"${file.name}" is too large (over 15MB). Try a smaller file.`;
+        errorBox.style.display = 'block';
+        continue;
+      }
+      const base64 = await fileToBase64(file);
+      pendingFiles.push({ name: file.name, mimeType, base64, isImage: mimeType.startsWith('image/') });
+    }
+    fileInput.value = '';
+    renderAttachments();
+  });
+
+  function renderAttachments() {
+    attachmentsEl.innerHTML = '';
+    pendingFiles.forEach((f, idx) => {
+      const chip = document.createElement('div');
+      chip.className = 'attachment-chip';
+      if (f.isImage) {
+        const img = document.createElement('img');
+        img.src = `data:${f.mimeType};base64,${f.base64}`;
+        chip.appendChild(img);
+      }
+      const name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = f.name;
+      chip.appendChild(name);
+      const remove = document.createElement('span');
+      remove.className = 'remove';
+      remove.textContent = '\u00d7';
+      remove.addEventListener('click', () => { pendingFiles.splice(idx, 1); renderAttachments(); });
+      chip.appendChild(remove);
+      attachmentsEl.appendChild(chip);
+    });
+    const hasImage = pendingFiles.some((f) => f.isImage);
+    editModeLabel.style.display = hasImage ? 'flex' : 'none';
+    if (!hasImage) editModeCheckbox.checked = false;
+  }
+
+  // --- Chat input UX ---
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
+  });
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  sendBtn.addEventListener('click', send);
+
+  function friendlyError(message) {
+    const lower = (message || '').toLowerCase();
+    if (lower.includes('invalid authentication credentials') || lower.includes('api key not valid') || lower.includes('api_key_invalid')) {
+      return 'The server\'s API key looks invalid. Check the GEMINI_API_KEY environment variable in your Netlify site settings.';
+    }
+    if (lower.includes('quota') || lower.includes('resource_exhausted')) {
+      return 'You\'ve hit today\'s free usage limit. It resets automatically — try again later.';
+    }
+    if (lower.includes('no longer available') || lower.includes('not found')) {
+      return 'This AI model was retired by Google. Let your developer know so the model name in the backend can be updated.';
+    }
+    return 'Error: ' + message;
+  }
+
+  function addRow(role, text, files, resultImage) {
+    if (emptyState) emptyState.remove();
+    const row = document.createElement('div');
+    row.className = 'row ' + role;
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    if (role === 'assistant') {
+      const label = document.createElement('div');
+      label.className = 'label';
+      label.textContent = 'Aide';
+      row.appendChild(label);
+      row.style.flexDirection = 'column';
+      row.style.alignItems = 'flex-start';
+    }
+    bubble.textContent = text;
+
+    if (files && files.length) {
+      const wrap = document.createElement('div');
+      wrap.className = 'bubble-attachments';
+      files.forEach((f) => {
+        if (f.isImage) {
+          const img = document.createElement('img');
+          img.src = `data:${f.mimeType};base64,${f.base64}`;
+          wrap.appendChild(img);
+        } else {
+          const pill = document.createElement('span');
+          pill.className = 'file-pill';
+          pill.textContent = f.name;
+          wrap.appendChild(pill);
+        }
+      });
+      bubble.appendChild(wrap);
+    }
+
+    if (resultImage) {
+      const img = document.createElement('img');
+      img.className = 'result-image';
+      img.src = `data:${resultImage.mimeType};base64,${resultImage.base64}`;
+      bubble.appendChild(img);
+      const bar = document.createElement('div');
+      bar.className = 'image-export-bar';
+      ['png', 'jpg', 'webp'].forEach((fmt) => {
+        const btn = document.createElement('button');
+        btn.textContent = 'Save as ' + fmt.toUpperCase();
+        btn.addEventListener('click', () => downloadImageAs(resultImage, fmt));
+        bar.appendChild(btn);
+      });
+      bubble.appendChild(bar);
+    }
+
+    if (role === 'assistant' && text) {
+      const bar = document.createElement('div');
+      bar.className = 'export-bar';
+      const wordBtn = document.createElement('button');
+      wordBtn.textContent = 'Save as Word';
+      wordBtn.addEventListener('click', () => exportAsWord(text));
+      const pdfBtn = document.createElement('button');
+      pdfBtn.textContent = 'Save as PDF';
+      pdfBtn.addEventListener('click', () => exportAsPDF(text));
+      const excelBtn = document.createElement('button');
+      excelBtn.textContent = 'Save as Excel';
+      excelBtn.addEventListener('click', () => exportAsExcel(text));
+      bar.appendChild(wordBtn);
+      bar.appendChild(pdfBtn);
+      bar.appendChild(excelBtn);
+      bubble.appendChild(bar);
+    }
+
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping() {
+    if (emptyState) emptyState.remove();
+    const row = document.createElement('div');
+    row.className = 'row assistant';
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'flex-start';
+    row.id = 'typingRow';
+    const label = document.createElement('div');
+    label.className = 'label';
+    label.textContent = 'Aide';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+    row.appendChild(label);
+    row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function removeTyping() {
+    const row = document.getElementById('typingRow');
+    if (row) row.remove();
+  }
+
+  // --- Export helpers ---
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function exportAsWord(text) {
+    try {
+      const { Document, Packer, Paragraph } = window.docx;
+      const doc = new Document({ sections: [{ children: text.split('\n').map((line) => new Paragraph(line || ' ')) }] });
+      const blob = await Packer.toBlob(doc);
+      downloadBlob(blob, 'aide-document.docx');
+    } catch (err) {
+      errorBox.textContent = 'Could not create Word file: ' + err.message;
+      errorBox.style.display = 'block';
+    }
+  }
+
+  function exportAsPDF(text) {
+    try {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
+      const margin = 48;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const lines = pdf.splitTextToSize(text, pageWidth - margin * 2);
+      let y = margin;
+      pdf.setFontSize(11);
+      lines.forEach((line) => {
+        if (y > pageHeight - margin) { pdf.addPage(); y = margin; }
+        pdf.text(line, margin, y);
+        y += 15;
+      });
+      pdf.save('aide-document.pdf');
+    } catch (err) {
+      errorBox.textContent = 'Could not create PDF: ' + err.message;
+      errorBox.style.display = 'block';
+    }
+  }
+
+  function exportAsExcel(text) {
+    try {
+      const lines = text.split('\n').filter((l) => l.trim().length > 0);
+      const tableLines = lines.filter((l) => l.trim().startsWith('|'));
+      let rows;
+      if (tableLines.length > 1) {
+        rows = tableLines
+          .filter((l) => !/^\|[\s\-:|]+\|$/.test(l.trim()))
+          .map((l) => l.split('|').map((c) => c.trim()).filter((c, i, arr) => !(i === 0 && c === '') && !(i === arr.length - 1 && c === '')));
+      } else {
+        rows = lines.map((l) => [l]);
+      }
+      const ws = XLSX.utils.aoa_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Aide');
+      XLSX.writeFile(wb, 'aide-document.xlsx');
+    } catch (err) {
+      errorBox.textContent = 'Could not create Excel file: ' + err.message;
+      errorBox.style.display = 'block';
+    }
+  }
+
+  function downloadImageAs(resultImage, format) {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (format !== 'png') { ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, canvas.width, canvas.height); }
+      ctx.drawImage(img, 0, 0);
+      const mime = format === 'jpg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png';
+      canvas.toBlob((blob) => downloadBlob(blob, `aide-image.${format}`), mime, 0.95);
+    };
+    img.src = `data:${resultImage.mimeType};base64,${resultImage.base64}`;
+  }
+
+  // --- Send logic ---
+  async function send() {
+    const text = inputEl.value.trim();
+    if (!text && pendingFiles.length === 0) return;
+
+    errorBox.style.display = 'none';
+    const filesForThisMessage = pendingFiles;
+    const editMode = editModeCheckbox.checked && filesForThisMessage.some((f) => f.isImage);
+    addRow('user', text, filesForThisMessage);
+
+    pendingFiles = [];
+    renderAttachments();
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+    sendBtn.disabled = true;
+    addTyping();
+
+    if (editMode) {
+      await sendImageEdit(text, filesForThisMessage);
+    } else {
+      await sendTextMessage(text, filesForThisMessage);
+    }
+
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
+  async function sendTextMessage(text, filesForThisMessage) {
+    const parts = [];
+    if (text) parts.push({ text });
+    filesForThisMessage.forEach((f) => parts.push({ inline_data: { mime_type: f.mimeType, data: f.base64 } }));
+    history.push({ role: 'user', parts });
+
+    try {
+      const response = await fetch("/.netlify/functions/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: history })
+      });
+      const data = await response.json();
+      removeTyping();
+      if (data.error) throw new Error(data.error);
+
+      addRow('assistant', data.reply);
+      history.push({ role: 'model', parts: [{ text: data.reply }] });
+    } catch (err) {
+      removeTyping();
+      errorBox.textContent = friendlyError(err.message);
+      errorBox.style.display = 'block';
+    }
+  }
+
+  async function sendImageEdit(text, filesForThisMessage) {
+    const image = filesForThisMessage.find((f) => f.isImage);
+    const instruction = text || 'Improve this photo.';
+
+    try {
+      const response = await fetch("/.netlify/functions/edit-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction, mimeType: image.mimeType, base64: image.base64 })
+      });
+      const data = await response.json();
+      removeTyping();
+      if (data.error) throw new Error(data.error);
+
+      if (!data.image) {
+        addRow('assistant', data.text || "I couldn't edit that image — try describing the change more specifically.");
+        return;
+      }
+
+      addRow('assistant', data.text || "Here's the edited image:", null, data.image);
+    } catch (err) {
+      removeTyping();
+      errorBox.textContent = friendlyError(err.message);
+      errorBox.style.display = 'block';
+    }
+  }
+</script>
+</body>
+</html>
